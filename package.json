@@ -1,0 +1,16 @@
+{
+  "name": "reglplay",
+  "version": "1.0.0",
+  "description": "openGL web stuff",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dat.gui": "^0.7.2",
+    "regl": "^1.3.5",
+    "victor": "^1.1.0"
+  }
+}
