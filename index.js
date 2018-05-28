@@ -3,6 +3,7 @@ var Vic = require('victor');
 var dat = require('dat.gui');
 
 
+
 function rgb_to_float(color){
   return [color[0]/255, color[1]/255, color[2]/255, color[3]];
 }
@@ -37,18 +38,32 @@ const drawTriangle = regl({
 vec2 cmpxmul(in vec2 a, in vec2 b) {
   return vec2(a.x * b.x - a.y * b.y, a.y * b.x + a.x * b.y);
 }
-
+vec2 cmpxsqrt(in vec2 a, float c){
+  float tanxy = atan(a.x,a.y);
+  float mag  = (a.x * a.x) + (a.y * a.y);
+  vec2 imag = vec2(cos( c * tanxy ), sin(c * tanxy));
+  return pow(mag, c/2.) * imag; 
+}
     void main() {
       vec2 z = uv * scale;
-      for(int i=0; i < 33; i++){
-         z = cmpxmul(z, z);
-         z = cmpxmul(z, z);
-         z =  z + offset;
-         if(length(z) > 2.0) break;
-      }
+      int jj = 0; 
+      vec2 prev;
+      for(int i=0; i < 19; i++){
+        prev = z;
+         jj++;
 
-      gl_FragColor = vec4(atan(z.y, z.x),z.y, z.x,1);
-      
+         vec2 zz = cmpxsqrt(z, 1.25);
+         z =  zz + offset;
+         if(length(z) > 2.0) {
+          prev = z;
+         };
+      };
+
+      vec4 inside = vec4((dot(prev, z)+1.)/2.,1.,0, 1);
+      vec4 outside= vec4(atan(z.y, z.x),z.y, z.x,1);      
+      gl_FragColor = mix(inside, outside, distance(prev, z));
+      //  gl_FragColor = ;
+    
     }`,
 
   vert: `
