@@ -1,15 +1,39 @@
 var regl = require('regl')();
 var Vic = require('victor');
 var dat = require('dat.gui');
+var mat4 = require('gl-mat4')
+var kernal = require('./kernal');
+var mouse = require('mouse-change')();
 
+print_once = true;
+function hex_mesh(center, size){
+  var hex_vtx = (i)=> {
+    angle = ((60 * i - 30) * 3.1415/180); 
+    return [center[0] + size * Math.cos(angle), center[1] + size * Math.sin(angle)];
+  };
+  edges = [0,1,2,3,4,5].map(hex_vtx);
+  ret = [];
+  for(var i = 0; i < 6; i++){
+    ret.push(hex_vtx(i))
+    ret.push(hex_vtx(i+1))
+    ret.push([center[0], center[1]])
+  }
 
+  if(print_once){
+    print_once = false;
+    console.log(edges +" length" + edges.length);
+
+    console.log(ret +" length" + ret.length);
+  }
+  return ret;
+}
 
 function rgb_to_float(color){
   return [color[0]/255, color[1]/255, color[2]/255, color[3]];
 }
 var proc = function(){
   this.color = [244,15,155,1.];
-  this.scale = .6;
+  this.scale = 20;
   this.offset = .62;
   this.cmplx = -.4938;
 }
@@ -19,7 +43,7 @@ window.onload = function(){
   procgen = new proc();
   var gui = new dat.GUI();
   gui.addColor(procgen, 'color');
-  gui.add(procgen, 'scale', .0, 2);
+  gui.add(procgen, 'scale', .0, 200);
   gui.add(procgen, 'offset', -1, 1);
   gui.add(procgen, 'cmplx', -1, 1);
 
@@ -31,49 +55,18 @@ const drawTriangle = regl({
   frag: `
     precision mediump float;
     uniform vec4 color;
-    uniform float scale;
-    uniform vec2 offset;
-    varying vec2 uv;
-
-vec2 cmpxmul(in vec2 a, in vec2 b) {
-  return vec2(a.x * b.x - a.y * b.y, a.y * b.x + a.x * b.y);
-}
-vec2 cmpxsqrt(in vec2 a, float c){
-  float tanxy = atan(a.x,a.y);
-  float mag  = (a.x * a.x) + (a.y * a.y);
-  vec2 imag = vec2(cos( c * tanxy ), sin(c * tanxy));
-  return pow(mag, c/2.) * imag; 
-}
     void main() {
-      vec2 z = uv * scale;
-      int jj = 0; 
-      vec2 prev;
-      for(int i=0; i < 19; i++){
-        prev = z;
-         jj++;
-
-         vec2 zz = cmpxsqrt(z, 1.25);
-         z =  zz + offset;
-         if(length(z) > 2.0) {
-          prev = z;
-         };
-      };
-
-      vec4 inside = vec4((dot(prev, z)+1.)/2.,1.,0, 1);
-      vec4 outside= vec4(atan(z.y, z.x),z.y, z.x,1);      
-      gl_FragColor = mix(inside, outside, distance(prev, z));
-      //  gl_FragColor = ;
-    
+      gl_FragColor = color;    
     }`,
 
   vert: `
     precision mediump float;
     attribute vec2 position;
-    varying vec2 uv;
+    uniform mat4 projection;
+
 
     void main() {
-      uv = vec2(position.x, position.y)- vec2(.03,.2);
-      gl_Position = vec4(position , 0, 1);
+      gl_Position = projection * vec4(position , 0, 1);
     }`,
 
   // Here we define the vertex attributes for the above shader
@@ -88,15 +81,25 @@ vec2 cmpxsqrt(in vec2 a, float c){
     color: regl.prop('color'),
     scale: regl.prop('scale'),
     offset: regl.prop('offset'),
+     projection: ({viewportWidth, viewportHeight}) => {
+      // mat4.translate here? 
+      return mat4.ortho([],
+       -viewportWidth/2, viewportWidth/2,  
+        -viewportHeight/2, viewportHeight/2,
+        - 0.01,
+        1000);
+    }
   },
 
   // This tells regl the number of vertices to draw in this command
-  count: 6
+  count: 6 * 3
 })
 
 // regl.frame() wraps requestAnimationFrame and also handles viewport changes
-var t = regl.frame(({time, tick, viewportHeight, framebufferHeight}) => {
+var t = regl.frame(({time, tick,viewportWidth, viewportHeight}) => {
   try{
+
+    const {x, y} = mouse;
   // clear contents of the drawing buffer
   regl.clear({
  //   color: [.3, .5,.1, 1],
@@ -108,14 +111,7 @@ var t = regl.frame(({time, tick, viewportHeight, framebufferHeight}) => {
     offset: [procgen.offset, procgen.cmplx],
     color: rgb_to_float(procgen.color), 
     positions: regl.buffer( {usage: 'stream',
-      data: new Float32Array(
-      [-1, 1,   // no need to flatten nested arrays, regl automatically
-      1, 1,    // unrolls them into a typedarray (default Float32)
-      -1,  -1,
-     1, 1,   // no need to flatten nested arrays, regl automatically
-      -1, -1,    // unrolls them into a typedarray (default Float32)
-      1,  -1
-      ])
+      data: hex_mesh([x- viewportWidth/2,viewportHeight/2-y], procgen.scale)
     })
   });
   }catch(e){
