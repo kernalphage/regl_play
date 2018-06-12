@@ -27,6 +27,12 @@
             this.s = s;
             if (Math.round(q + r + s) !== 0)
                 throw "q + r + s must be 0 : " + q + ", " + r + ", " + s;
+        }        
+        static equals(a, b) {
+            return (a.q === b.q && a.r === b.r);
+        }
+        equal(b) {
+            return (this.q === b.q && this.r === b.r);
         }
         add(b) {
             return new Hex(this.q + b.q, this.r + b.r, this.s + b.s);
@@ -48,6 +54,9 @@
         }
         neighbor(direction) {
             return this.add(Hex.direction(direction));
+        }
+        neighbors() {
+            return [this.neighbor(0),this.neighbor(1),this.neighbor(2),this.neighbor(3),this.neighbor(4),this.neighbor(5),]
         }
         diagonalNeighbor(direction) {
             return this.add(Hex.diagonals[direction]);
@@ -210,6 +219,8 @@
     Layout.pointy = new Orientation(Math.sqrt(3.0), Math.sqrt(3.0) / 2.0, 0.0, 3.0 / 2.0, Math.sqrt(3.0) / 3.0, -1.0 / 3.0, 0.0, 2.0 / 3.0, 0.5);
     Layout.flat = new Orientation(3.0 / 2.0, 0.0, Math.sqrt(3.0) / 2.0, Math.sqrt(3.0), 2.0 / 3.0, 0.0, -1.0 / 3.0, Math.sqrt(3.0) / 3.0, 0.0);
     exports.Layout = Layout;
+    
+
     class Tests {
         constructor() { }
         static equalHex(name, a, b) {
