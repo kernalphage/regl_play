@@ -65,7 +65,12 @@ function hex_group( center, nodes ){
       return _.flattenDeep(_.map(this.nodes, (n)=>hex_mesh(layout.hexToPixel(this.center.add(n)), 40)));
     },
     rotateLeft: function(){
-      this.nodes = _.map(nodes, (n)=>n.rotateLeft());
+      console.log(this.nodes);
+
+      for(var i=0; i < this.nodes.length; i++){
+        this.nodes[i] = this.nodes[i].rotateLeft();
+      }
+//      this.nodes = _.map(nodes, (n)=> return n.rotateLeft()); // why is this not identical? (only works once)
     },
     normalized: function(){
       return _.map(this.nodes, (n)=> this.center.add(n));
@@ -98,6 +103,10 @@ function hex_group( center, nodes ){
       _.forEach(this.nodes, function(node){
         drawHex(node.add(center), 'rgb(100,100,100)', 10);
       })
+      var pixLoc = layout.hexToPixel(this.center);
+      ctx.font = '20px bold sans-serif';
+      ctx.fillStyle='rgb(0,0,0)';
+      ctx.fillText(this.storage+'/'+this.maxStorage, pixLoc.x, pixLoc.y);
     }
   }
 }
@@ -134,11 +143,13 @@ function animationFrame(){
   var hexmouse = layout.pixelToHex(mouse).round();
   drawHex(hexmouse, 'rgba(200,10,100,20)', 23);
   
-  if(input.key)
+  if(input.getKey(82).pressed){
+    building.rotateLeft();
+    console.log("rotating left");
+  }
 
   building.render();
   building.update();
-
 
 
   if(building.intersects([hexmouse])){

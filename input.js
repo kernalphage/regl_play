@@ -11,7 +11,7 @@ exports.finishFrame = function(){
 
 exports.getKey = function(kcode){
 	if(! exports.keys[kcode]){
-		exports.keys[kcode] = _makeButton();
+		exports.keys[kcode] = _makeButton(kcode);
 	}
 	return exports.keys[kcode];
 };
