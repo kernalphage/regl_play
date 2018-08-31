@@ -11,7 +11,8 @@ const kernal = {
 
 	mix: function(a, b, t){
 		return a * t + b * (1-t);
-	}
+	},
+
 }
 
 module.exports.kernal = kernal;

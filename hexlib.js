@@ -52,6 +52,9 @@
         static direction(direction) {
             return Hex.directions[direction];
         }
+        neighbors() {
+            return [this.neighbor(0), this.neighbor(1), this.neighbor(2), this.neighbor(3), this.neighbor(4), this.neighbor(5)];
+        }
         neighbor(direction) {
             return this.add(Hex.direction(direction));
         }

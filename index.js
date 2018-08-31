@@ -1,16 +1,37 @@
 'use strict';
-var material = require('./Material');
 var Vic = require('victor');
 var dat = require('dat.gui');
 var kernal = require('./kernal');
 var Hex = require('./hexlib');
-var mouse = require('mouse-change')();
+var mouse = {x:0,y:0,button:0};
 var _ = require('lodash');
+var input = require('./input');
 
 var h = new  Hex.Hex(1,1);
-var layout = new Hex.Layout(Hex.Layout.pointy, new Hex.Point(40,40) , new Hex.Point(0,0));
-var print_once = true;
+var layout = new Hex.Layout(Hex.Layout.pointy, new Hex.Point(15,15) , new Hex.Point(200,200));
 
+var textBuffer = {
+  cur: "",
+  indent: 0,
+  dom:null,
+  register: function(dom) {this.dom = dom},
+  push: function(txt){ if(txt) this.log(txt); this.indent ++; },
+  pop: function(){ this.indent--;},
+  render: function(){
+    if(this.dom){
+      this.dom.innerHTML = this.cur;
+    }
+    this.cur = "";
+    this.indent = 0;
+  },
+  log: function(obj){
+    if(typeof obj !== "string"){
+      obj = JSON.stringify(obj);
+    }
+    for(var i = 0; i < this.indent; i++){ this.cur += "\t"; };
+    this.cur +=  obj + "\n";
+  }
+}
 function hex_mesh(center, size) {
   var hex_vtx = (i) => {
     let angle = ((60 * i - 30) * 3.1415 / 180);
@@ -37,8 +58,9 @@ function hex_group( center, nodes ){
     nodes: nodes,
     center: center,
     storage: 0,
+    maxStorage:10,
     ticks: 0,
-    maxTicks: 10,
+    maxTicks: 30,
     mesh: function(){
       return _.flattenDeep(_.map(this.nodes, (n)=>hex_mesh(layout.hexToPixel(this.center.add(n)), 40)));
     },
@@ -64,104 +86,102 @@ function hex_group( center, nodes ){
       return false;
     },
     update(){
-      ticks++;
-      if(ticks > maxTicks){
-        ticks -= maxTicks;
-        storage++;
+      this.ticks++;
+      if(this.ticks > this.maxTicks){
+        this.ticks -= this.maxTicks;
+        if(this.storage < this.maxStorage){
+          this.storage++;
+        }
       }
+    },
+    render(){
+      _.forEach(this.nodes, function(node){
+        drawHex(node.add(center), 'rgb(100,100,100)', 10);
+      })
     }
   }
 }
 
-var textBuffer = {
-  cur: "",
-  prev: "",
-  indent: 0,
-  push: function(){ this.indent ++; },
-  pop: ()=> this.indent--,
-  render: function(){
-    if(this.prev != this.cur){
-      console.log(this.cur);
-    }
-    this.prev = this.cur;
-    this.cur = "";
-    this.indent = 0;
-  },
-  log: function(obj){
-    if(typeof obj !== "String"){
-      obj = JSON.stringify(obj);
-    }
-    for(var i = 0; i < this.indent; i++){ this.cur += "\t"; };
-    this.cur +=  obj + "\n";
-  }
+function drawHex(pos, color, radius){
+      var pos = layout.hexToPixel(pos);
+      ctx.fillStyle = color;
+      ctx.fillRect(pos.x, pos.y,radius,radius);
 }
-
 
 function rgb_to_float(color) {
   return [color[0] / 255, color[1] / 255, color[2] / 255, color[3]];
-  }
+}
 var proc = function() {
   this.color = [244, 15, 155, 1.];
-  this.scale = 40;
-  this.offset = .62;
+  this.scale = 15;
   this.cmplx = -.4938;
-  this.posx =0;
-  this.posy = 0;
 }
 var procgen;
+var canv;
+var ctx;
+
+function animationFrame(){
+  layout.size = {x:procgen.scale, y:procgen.scale};
+  ctx = canv.getContext('2d');
+  ctx.fillStyle = 'rgb(10,25,54)'
+  ctx.fillRect(0,0,400,400);
+
+  for(var i=-5; i < 5; i++){
+    for(var j=-5; j < 5;j++){
+      drawHex(new Hex.Hex(i,j), 'rgb(100,200,200)', 20);
+    }
+  }
+  var hexmouse = layout.pixelToHex(mouse).round();
+  drawHex(hexmouse, 'rgba(200,10,100,20)', 23);
+  
+  if(input.key)
+
+  building.render();
+  building.update();
+
+
+
+  if(building.intersects([hexmouse])){
+    textBuffer.push("building");
+    textBuffer.log("stock "+building.storage + "/" + building.maxStorage);
+    textBuffer.log("ticks "+building.ticks);
+    textBuffer.pop();
+  }
+  textBuffer.push("hexMouse");
+  textBuffer.log(hexmouse);
+  textBuffer.pop();
+  input.debugRender(textBuffer);
+  textBuffer.render();
+  input.finishFrame();
+  window.requestAnimationFrame(animationFrame);
+}
+
+var building = new hex_group( new Hex.Hex(2,2), [new Hex.Hex(0,0),new Hex.Hex(0,1), new Hex.Hex(0,2)]);
 
 window.onload = function() {
-  material.loadMaterials();
+  canv = document.createElement("canvas");
+  canv.id = "mainCanvas"
+  
+  canv.width = 400;
+  canv.height = 400;
+  var log = document.createElement("pre");
+  document.body.appendChild(canv);
+  document.body.appendChild(log);
+
+  textBuffer.register(log);
+
+  canv.onmousemove = function(evt){
+   mouse.x = evt.clientX-20;
+   mouse.y = evt.clientY-20;
+   mouse.button = evt.button;
+  };
+
   procgen = new proc();
   var gui = new dat.GUI();
   gui.addColor(procgen, 'color');
-  gui.add(procgen, 'offset', -1, 1);
+  gui.add(procgen, 'scale', 10, 100);
   gui.add(procgen, 'cmplx', -1, 1);
-
-      // regl.frame() wraps requestAnimationFrame and also handles viewport
-      // changes
-      var t = material.regl.frame(({time, tick, viewportWidth, viewportHeight}) => {
-        try {
-          const {x, y, buttons} = mouse;
-          var mousePos =  new Hex.Point(x - viewportWidth / 2, viewportHeight / 2 - y);
-          var cube_pos = layout.pixelToHex(mousePos).round();
-          procgen.posx = cube_pos.x;
-          procgen.posy = cube_pos.y;
-
-          var hexG = hex_group(cube_pos, [new Hex.Hex(0,0), new Hex.Hex(1,0), new Hex.Hex(2,0), new Hex.Hex(1,1)]);
-          if(buttons){
-            
-            hexG = hex_group(new Hex.Hex(0,0), hexG.zone());
-          }
-
-
-         var verts = [hex_mesh({x:0, y:0}, procgen.scale), hexG.mesh()];
-        verts = _.flattenDeep(verts);
-        textBuffer.log("Mouse:");
-        textBuffer.push();
-        textBuffer.log(cube_pos);
-        textBuffer.pop();
-
-        textBuffer.render();
-
-        var intersects = hexG.intersects([new Hex.Hex(0,0)] );
-         //verts = [17.32066249627327,-9.99973253093265,17.32066249627327,9.99973253093265,0,0,17.32066249627327,9.99973253093265,0.0009265358975991552,19.99999997853828,0,0,0.0009265358975991552,19.99999997853828,-17.319735910812394,10.001337309565937,0,0,-17.319735910812394,10.001337309565937,-17.321588933041664,-9.998127666454781,0,0,-17.321588933041664,-9.998127666454781,-0.002779607684847885,-19.999999806844528,0,0,-0.002779607684847885,-19.999999806844528,17.318809176667,-10.002942002340859,0,0 ];
-          // clear contents of the drawing buffer
-          // draw a triangle using the command defined above
-          material.materials.flat2D({
-            scale: procgen.scale,
-            color: intersects ? rgb_to_float(procgen.color) : [.2,.0,.0, 1],
-              count: verts.length/2,
-            positions: material.regl.buffer({
-              usage: 'stream',
-              data: verts
-            })
-          });
-        } catch (e) {
-          console.error(e);
-          t.cancel();
-          throw(e);
-        }
-      })
-
+  window.requestAnimationFrame(animationFrame);
 }
+
+ 
