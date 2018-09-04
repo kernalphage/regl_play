@@ -57,10 +57,17 @@ function hex_group( center, nodes ){
   return {
     nodes: nodes,
     center: center,
-    storage: 0,
     maxStorage:10,
     ticks: 0,
     maxTicks: 30,
+
+neighbors: [null, null,null,null,null,null],
+  outidx: 0,
+  givetick: 0,
+  maxgivetick: 5,
+  storage: [],
+  maxStorage: 5,
+
     mesh: function(){
       return _.flattenDeep(_.map(this.nodes, (n)=>hex_mesh(layout.hexToPixel(this.center.add(n)), 40)));
     },
@@ -90,12 +97,13 @@ function hex_group( center, nodes ){
       }
       return false;
     },
+
     update(){
       this.ticks++;
       if(this.ticks > this.maxTicks){
         this.ticks -= this.maxTicks;
-        if(this.storage < this.maxStorage){
-          this.storage++;
+        if(this.storage.length < this.maxStorage){
+          this.storage.push({});
         }
       }
     },
@@ -106,7 +114,7 @@ function hex_group( center, nodes ){
       var pixLoc = layout.hexToPixel(this.center);
       ctx.font = '20px bold sans-serif';
       ctx.fillStyle='rgb(0,0,0)';
-      ctx.fillText(this.storage+'/'+this.maxStorage, pixLoc.x, pixLoc.y);
+      ctx.fillText((this.storage.length)+'/'+this.maxStorage, pixLoc.x, pixLoc.y);
     }
   }
 }
@@ -150,11 +158,13 @@ function animationFrame(){
 
   building.render();
   building.update();
+  building2.render();
+  building2.update();
 
 
   if(building.intersects([hexmouse])){
     textBuffer.push("building");
-    textBuffer.log("stock "+building.storage + "/" + building.maxStorage);
+    textBuffer.log("stock "+building.storage.length + "/" + building.maxStorage);
     textBuffer.log("ticks "+building.ticks);
     textBuffer.pop();
   }
@@ -168,7 +178,9 @@ function animationFrame(){
 }
 
 var building = new hex_group( new Hex.Hex(2,2), [new Hex.Hex(0,0),new Hex.Hex(0,1), new Hex.Hex(0,2)]);
+var building2 = new hex_group( new Hex.Hex(1,0), [new Hex.Hex(0,0),new Hex.Hex(0,1), new Hex.Hex(0,2)]);
 
+window.building = building;
 window.onload = function() {
   canv = document.createElement("canvas");
   canv.id = "mainCanvas"
