@@ -107,6 +107,26 @@ neighbors: [null, null,null,null,null,null],
         }
       }
     },
+  giveupdate: function(dt){
+    if(this.givetick++ >= this.maxgivetick){
+      this.givecurrentitem();
+    }
+  },
+  givecurrentitem: function(){
+    var target = this.neighbors[this.outidx++];
+    if(target && target.take(storage[0])){
+      this.storage.pop(0);
+      this.givetick = 0;
+    }
+  },
+  take: function(item){
+    if(this.storage.length < this.maxStorage){
+      this.storage.push(item);
+      return true;
+    }
+    return false;
+  },
+
     render(){
       _.forEach(this.nodes, function(node){
         drawHex(node.add(center), 'rgb(100,100,100)', 10);
@@ -160,7 +180,6 @@ function animationFrame(){
   building.update();
   building2.render();
   building2.update();
-
 
   if(building.intersects([hexmouse])){
     textBuffer.push("building");
