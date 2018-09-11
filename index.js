@@ -3,7 +3,7 @@ var Vic = require('victor');
 var dat = require('dat.gui');
 var kernal = require('./kernal');
 var Hex = require('./hexlib');
-var mouse = {x:0,y:0,button:0};
+var mouse = {x:0, y:0, button:0};
 var _ = require('lodash');
 var input = require('./input');
 
@@ -14,7 +14,7 @@ var textBuffer = {
   cur: "",
   indent: 0,
   dom:null,
-  register: function(dom) {this.dom = dom},
+  register: function(dom) {this.dom = dom;},
   push: function(txt){ if(txt) this.log(txt); this.indent ++; },
   pop: function(){ this.indent--;},
   render: function(){
@@ -31,7 +31,8 @@ var textBuffer = {
     for(var i = 0; i < this.indent; i++){ this.cur += "\t"; };
     this.cur +=  obj + "\n";
   }
-}
+};
+
 function hex_mesh(center, size) {
   var hex_vtx = (i) => {
     let angle = ((60 * i - 30) * 3.1415 / 180);
@@ -53,10 +54,11 @@ function hex_mesh(center, size) {
   return ret;
   }
 
-function hex_group( center, nodes ){
+function hex_group( center, nodes, outputs ){
   return {
-    nodes: nodes,
+    nodes: nodes.slice(),
     center: center,
+    outputs: outputs ? outputs.slice() : [],
     maxStorage:10,
     ticks: 0,
     maxTicks: 30,
@@ -64,9 +66,10 @@ function hex_group( center, nodes ){
 neighbors: [null, null,null,null,null,null],
   outidx: 0,
   givetick: 0,
-  maxgivetick: 5,
+  maxgivetick: 100,
   storage: [],
   maxStorage: 5,
+  mines:true,
 
     mesh: function(){
       return _.flattenDeep(_.map(this.nodes, (n)=>hex_mesh(layout.hexToPixel(this.center.add(n)), 40)));
@@ -76,6 +79,9 @@ neighbors: [null, null,null,null,null,null],
 
       for(var i=0; i < this.nodes.length; i++){
         this.nodes[i] = this.nodes[i].rotateLeft();
+      }
+      for(var i=0; i < this.outputs.length; i++){
+        this.outputs[i] = this.outputs[i].rotateLeft();
       }
 //      this.nodes = _.map(nodes, (n)=> return n.rotateLeft()); // why is this not identical? (only works once)
     },
@@ -99,12 +105,17 @@ neighbors: [null, null,null,null,null,null],
     },
 
     update(){
-      this.ticks++;
-      if(this.ticks > this.maxTicks){
-        this.ticks -= this.maxTicks;
-        if(this.storage.length < this.maxStorage){
-          this.storage.push({});
+      if(this.mines){
+        this.ticks++;
+        if(this.ticks > this.maxTicks){
+          this.ticks -= this.maxTicks;
+          if(this.storage.length < this.maxStorage){
+            this.storage.push({});
+          }
         }
+      }
+      if(this.outputs){
+        this.giveupdate(this.ticks);
       }
     },
   giveupdate: function(dt){
@@ -113,8 +124,8 @@ neighbors: [null, null,null,null,null,null],
     }
   },
   givecurrentitem: function(){
-    var target = this.neighbors[this.outidx++];
-    if(target && target.take(storage[0])){
+    var target = this.neighbors[this.outidx++ % this.neighbors.length];
+    if(target && target.take(this.storage[0],this.curoutput)){
       this.storage.pop(0);
       this.givetick = 0;
     }
@@ -129,11 +140,17 @@ neighbors: [null, null,null,null,null,null],
 
     render(){
       _.forEach(this.nodes, function(node){
-        drawHex(node.add(center), 'rgb(100,100,100)', 10);
+        drawHex(node.add(center).add(new Hex.Hex(.0,.25)), 'rgb(100,100,100)', procgen.scale);
       })
+      if(this.outputs){
+        _.forEach(this.outputs, function(output){
+                  drawHex(output.add(center).add(new Hex.Hex(.0,.25)), 'rgba(100,00,00,20)', procgen.scale);
+
+        })
+      }
       var pixLoc = layout.hexToPixel(this.center);
-      ctx.font = '20px bold sans-serif';
-      ctx.fillStyle='rgb(0,0,0)';
+      ctx.font = (procgen.scale * 1.25) + 'px bold sans-serif';
+      ctx.fillStyle='rgb(255,155,100)';
       ctx.fillText((this.storage.length)+'/'+this.maxStorage, pixLoc.x, pixLoc.y);
     }
   }
@@ -150,43 +167,59 @@ function rgb_to_float(color) {
 }
 var proc = function() {
   this.color = [244, 15, 155, 1.];
-  this.scale = 15;
-  this.cmplx = -.4938;
+  this.scale = 45;
 }
 var procgen;
 var canv;
 var ctx;
+var straight_miner =  [new Hex.Hex(0,0),new Hex.Hex(0,1), new Hex.Hex(0,2)];
+var miner_gives =[new Hex.Hex(0,-1)]
+var chest = [new Hex.Hex(0,0)];
+var buildings = [new hex_group( new Hex.Hex(2,2), straight_miner, miner_gives),
+                 new hex_group( new Hex.Hex(1,1), straight_miner, miner_gives ), 
+                 new hex_group( new Hex.Hex(2,1), chest)
+                 ];
+
+buildings[1].rotateLeft();
+buildings[1].rotateLeft();
+buildings[1].rotateLeft();
+buildings[1].rotateLeft();
+
+buildings[0].neighbors = [buildings[2]];
+buildings[1].neighbors = [buildings[2]];
+buildings[2].mines = false;
+buildings[2].maxStorage = 100;
 
 function animationFrame(){
   layout.size = {x:procgen.scale, y:procgen.scale};
   ctx = canv.getContext('2d');
   ctx.fillStyle = 'rgb(10,25,54)'
-  ctx.fillRect(0,0,400,400);
+  ctx.fillRect(0,0,canv.width,canv.height);
 
   for(var i=-5; i < 5; i++){
     for(var j=-5; j < 5;j++){
-      drawHex(new Hex.Hex(i,j), 'rgb(100,200,200)', 20);
+      drawHex(new Hex.Hex(i,j), 'rgb(100,200,200)', procgen.scale *1.49 );
     }
   }
   var hexmouse = layout.pixelToHex(mouse).round();
   drawHex(hexmouse, 'rgba(200,10,100,20)', 23);
   
   if(input.getKey(82).pressed){
-    building.rotateLeft();
+    buildings[0].rotateLeft();
     console.log("rotating left");
   }
 
-  building.render();
-  building.update();
-  building2.render();
-  building2.update();
+  _.forEach(buildings, function(building, index){
+    building.render();
+    building.update();
+    if(building.intersects([hexmouse])){
+      textBuffer.push("building " + index);
+      textBuffer.log("stock "+building.storage.length + "/" + building.maxStorage);
+      textBuffer.log("ticks "+building.ticks);
+      textBuffer.pop();
+    }
+  });
 
-  if(building.intersects([hexmouse])){
-    textBuffer.push("building");
-    textBuffer.log("stock "+building.storage.length + "/" + building.maxStorage);
-    textBuffer.log("ticks "+building.ticks);
-    textBuffer.pop();
-  }
   textBuffer.push("hexMouse");
   textBuffer.log(hexmouse);
   textBuffer.pop();
@@ -196,20 +229,21 @@ function animationFrame(){
   window.requestAnimationFrame(animationFrame);
 }
 
-var building = new hex_group( new Hex.Hex(2,2), [new Hex.Hex(0,0),new Hex.Hex(0,1), new Hex.Hex(0,2)]);
-var building2 = new hex_group( new Hex.Hex(1,0), [new Hex.Hex(0,0),new Hex.Hex(0,1), new Hex.Hex(0,2)]);
-
-window.building = building;
+window.buildings = buildings;
 window.onload = function() {
   canv = document.createElement("canvas");
   canv.id = "mainCanvas"
   
-  canv.width = 400;
-  canv.height = 400;
+  canv.width = 700;
+  canv.height = 700;
+  canv.style.width = 700;
+  canv.style.height = 700;
+
   var log = document.createElement("pre");
   document.body.appendChild(canv);
   document.body.appendChild(log);
-
+  log.style.float = "right"
+  log.style.paddingTop = "500px"
   textBuffer.register(log);
 
   canv.onmousemove = function(evt){
@@ -222,7 +256,6 @@ window.onload = function() {
   var gui = new dat.GUI();
   gui.addColor(procgen, 'color');
   gui.add(procgen, 'scale', 10, 100);
-  gui.add(procgen, 'cmplx', -1, 1);
   window.requestAnimationFrame(animationFrame);
 }
 
